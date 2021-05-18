@@ -1,0 +1,125 @@
+<html>
+    <head>
+        <link href='https://fonts.googleapis.com/css?family=Roboto' rel='stylesheet'>
+        <script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/css/bootstrap.min.css" integrity="sha384-B0vP5xmATw1+K9KRQjQERJvTumQW0nPEzvF6L/Z6nronJ3oUOFUFpCjEUQouq2+l" crossorigin="anonymous">
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/js/bootstrap.min.js" integrity="sha384-+YQ4JLhjyBLPDQt//I+STsc9iw4uQqACwlvpslubQzn4u2UU2UFM80nGisd026JF" crossorigin="anonymous"></script>
+    </head>
+    <style>
+        body {
+            font-family: 'Roboto';
+        }
+        h2 {
+            padding: 10px 0;
+            font-weight: bold;
+        }
+    </style>
+    <body>
+        <div class="container">
+            <h1 class="py-2 mt-5 border-bottom font-weight-bold">Adventures in Grounding to Object Positions</h1>
+            <a class="text-muted" href="https://dylanebert.com">Dylan Ebert</a>
+            <div class="mt-3" id="overview">
+                <p>This document gives an overview of my recent attempts to make use of spatial data,
+                    or the positions of objects over time, to represent verbs.
+                    I'll talk about the motivation for this, the models I've tried, and the results so far.
+                </p>
+            </div>
+            <div id="motivation">
+                <h2>Why spatial data?</h2>
+                <h4>Text-based NLP</h4>
+                <p>Most recent progress in NLP takes advantage of very large-scale language datasets and models to solve text-based tasks
+                    like question-answering. Take a look at the BoolQ task below.</p>
+                <div class="text-center">
+                    <figure class="figure">
+                        <img src="qbool.PNG" class="img-fluid">
+                        <figcaption class="figure-caption">BoolQ task from SuperGLUE, a common NLP benchmark.</figcaption>
+                    </figure>
+                </div>
+                <p>The input is text, and the output is text. This is the common setup for a question-answering task.
+                    However more recently, <a href="https://arxiv.org/pdf/2103.08493.pdf">prompt-based training</a> has been used
+                    to present a variety of text-based language tasks in terms of a prompt, question and answer, similar to a question-answering task.
+                    This is an example of a unified language model that surpasses human performance on many benchmarks.
+                    So, is language solved? No, not yet. So, what's missing? I, among many others, would argue that grounding is a necessary
+                    component of language understanding.</p>
+                <h4>Grounded NLP</h4>
+                <p>Grounding is the connection of language to the non-linguistic world. What does recent work in grounded NLP look like? 
+                    Some years ago, grounding meant image captioning, i.e. is below a picture of a zebra?</p>
+                <div class="text-center">
+                    <figure class="figure">
+                        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e3/Plains_Zebra_Equus_quagga.jpg/399px-Plains_Zebra_Equus_quagga.jpg" class="img-fluid">
+                        <figcaption class="figure-caption">Zebra?</figcaption>
+                    </figure>
+                </div>
+                <p>More recent work has <a href="https://arxiv.org/pdf/2102.02779.pdf">unified vision and language models</a> to learn representations that incorporate both images and text.
+                    This still falls short of human performance on tasks such as visual question-answering, but moves the needle toward it.
+                    So, with bigger models, more data, and better performance, will language be solved? I don't know. It's more difficult to support an answer to that than to whether grounding is necessary.
+                    However, it does raise another interesting question - what else can we do?</p>
+                <h4>Embodied NLP</h4>
+                <p>So far, I've only talked about tasks that produce some text output. But what about tasks that require doing something in the world?
+                    One example is <a href="https://askforalfred.com/">ALFRED</a>, a benchmark for mapping natural language instructions to sequences of actions.</p>
+                <div class="text-center">
+                    <figure class="figure">
+                        <img src="alfred.png" class="img-fluid">
+                        <figcaption class="figure-caption">Example instruction sequence from ALFRED</figcaption>
+                    </figure>
+                </div>
+                <p>This task involves the complex behaviors of objects, which makes more a much more challenging task. This is reflected in the current state-of-the-art on the data,
+                    which is <a href="https://leaderboard.allenai.org/alfred/submissions/public">under 10% for unseen sequences</a>, using attention-based neural networks, similar to those
+                    used for text-based NLP. Why is the performance so low? What makes this task so much more challenging than text-based tasks? These are the questions I'm most interested in.
+                    My goal is to explore new directions that may answer questions about this task. This direction is trying to learn actions from the spatial data of objects.
+                    However, to motivate how I came to this direction, I need to talk about abstraction.</p>
+                <h4>Broader Perspectives: Abstraction</h4>
+                <p>Taking a look at artificial intelligence as a whole, where does all of this fit? I'll use examples from <a href="https://www.sciencedirect.com/science/article/pii/S2352154618302080">On the Necessity of Abstraction</a>.
+                    Imagine a game of chess, and the information involved in playing chess. At the lowest layer of abstraction, we have raw sensory information - visual, auditory, and tactile. At a high level of abstraction,
+                    we have an 8x8 grid of chess pieces. When people think of chess, and when building AI to solve chess, it's mostly at the high level of abstraction. But when it comes to actually playing chess, there is a lot of
+                    intelligence that goes into the lower layers, from raw visual input to conceptualizing and physically making moves in chess.</p>
+                <div class="text-center">
+                    <figure class="figure">
+                        <img src="chess.jpg" class="img-fluid" style="max-width: 400px;">
+                        <figcaption class="figure-caption">A chess board.</figcaption>
+                    </figure>
+                </div>
+                <p>Somewhere between raw sensory inputs and playing chess are many layers of abstraction. For humans, these layers may include things like recognizing objects, situating oneself in the environment to be able to
+                    reach the pieces, see the chessboard, etc., and reaching for a piece to make a move. So, where do the previously discussed topics in NLP fit into this?</p>
+                <div class="row my-2">
+                    <div class="col-lg-4 card">
+                        <div class="card-body">
+                            <h5 class="card-title">Text-only models</h5>
+                            <p class="card-text">Most text-based tasks fall entirely within the same layer of abstraction - language. However, the story isn't that straightforward. Language itself may represent concepts at various levels
+                                of abstraction. For example, the word "dog" is much lower level than the word "cooperation". Additionally, probing experiments have shown that large language models learn to encode
+                                lower-level information like syntax.</p>
+                            <p class="card-text">In other words, text-only models are at the text level of abstraction, but may indirectly capture information from elsewhere in the abstraction tree.</p>
+                        </div>
+                    </div>
+                    <div class="col-lg-4 card">
+                        <div class="card-body">
+                            <h5 class="card-title">Visually-grounded models</h5>
+                            <p class="card-text">The example I used previously of object recognition falls neatly on the abstraction tree. The input is at the lowest level - vision. The output is, in one sense, objects, a layer up
+                                on the abstraction tree. We don't know exactly how this object-level representation looks for humans, but we do know that infants are able to recognize objects and expect them to behave a certain way
+                                very early on. This is already a very hard problem, which is the focus of years of ongoing computer vision research.</p>
+                            <p class="card-text">The unified vision-and-language models, on the other hand, are more like the text-only models, focusing mostly on the language level of abstraction, but being bolstered
+                                by information learned from the very low-level vision layer. Research has shown that these models lean more heavily on the text component to succeed.</p>
+                        </div>
+                    </div>
+                    <div class="col-lg-4 card">
+                        <div class="card-body">
+                            <h5 class="card-title">Embodied models</h5>
+                            <p class="card-text">Embodied AI incorporates many levels of abstraction. The ALFRED example has both raw vision and text as inputs, and an abstract representation of actions as outputs. This varies
+                                across different embodied tasks. For example, ManipulaTHOR incorporates adds more abstract inputs like <i>distance-to-goal</i>, and less abstract outputs like angles of the virtual robot's joints.
+                                For these, existing vision and language models are combined to train a complex model that, despite progress, still falls far short of human performance.</p>
+                            <p class="card-text">Putting this in terms of abstraction, this combines vision models, which exist at a low level of abstraction, with language models, which are more abstract, but may
+                                indirectly capture information from elsewhere in the abstraction tree. These are trained to predict actions, which exist somewhere in the middle of the abstraction tree, above fine-grained
+                                motor movements and basic concepts like "dog", and below high-level concepts like those seen in question-answering datasets.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <p>Given this framing of AI in terms of abstraction, we can then ask, what is missing? For a human, there may be many, many layers between visual inputs and language. So, what do these layers look like?
+                    Can they be represented and set up as tasks directly, or something more like the intermediate layers of a large neural network, which can be probed for information, but are indecipherable in and of themselves?
+                    One thing we do know is that infants know that object are things that they expect to behave a certain way. So, if vision to objects is the first layer of abstract, what might the next one be?
+                    In this project, that's what I'm exploring.</p>
+            </div>
+        </div>
+        <footer class="py-5 mt-5 border-top"></footer>
+    </body>
+</html>
