@@ -133,16 +133,14 @@
             tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
         });
 
-        var ctx = $('#chart');
-        var chart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: [100, 200],
-                datasets: [{
-                    data: [10, 20],
-                    label: 'test'
-                }]
-            }
+        $.get('https://raw.githubusercontent.com/dylanebert/spatial_blog/master/data.json', function(res) {
+            var data = $.parseJSON(res);
+            console.log(data);
+            var ctx = $('#chart');
+            var chart = new Chart(ctx, {
+                type: 'line',
+                data: data
+            })
         })
     </script>
 </html>

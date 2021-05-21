@@ -2,7 +2,7 @@ import pandas as pd
 import seaborn as sns
 import json
 
-df = pd.read_csv('data.csv', sep='\t', header=None, names=['frame', 'posX', 'posY', 'posZ', 'rotX', 'rotY', 'rotZ', 'rotW'])
+df = pd.read_csv('data.csv', sep='\t', header=None, names=['frame', 'posX', 'posZ', 'posY', 'rotX', 'rotY', 'rotZ', 'rotW'])
 df.set_index('frame', drop=True, inplace=True)
 labels = ['posX', 'posY', 'posZ']
 z = df[labels].to_numpy()
@@ -21,6 +21,8 @@ for i in range(n_dim):
         'fill': False
     }
     datasets.append(dataset)
-data = {'labels': df.index.to_numpy().astype(str).tolist(), 'datasets': datasets}
+index = df.index.to_numpy()
+index -= index[0]
+data = {'labels': index.astype(str).tolist(), 'datasets': datasets}
 with open('data.json', 'w+') as f:
     json.dump(data, f)
