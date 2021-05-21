@@ -4,7 +4,8 @@ import json
 
 df = pd.read_csv('data.csv', sep='\t', header=None, names=['frame', 'posX', 'posZ', 'posY', 'rotX', 'rotY', 'rotZ', 'rotW'])
 df.set_index('frame', drop=True, inplace=True)
-labels = ['posX', 'posY', 'posZ']
+labels = ['posX', 'posY', 'posZ', 'rotX', 'rotY', 'rotZ', 'rotW']
+hidden = [False, False, False, True, True, True, True]
 z = df[labels].to_numpy()
 n_frames, n_dim = z.shape
 pal = sns.color_palette('hls', n_dim).as_hex()
@@ -18,7 +19,8 @@ for i in range(n_dim):
         'data': points,
         'label': labels[i],
         'borderColor': pal[i],
-        'fill': False
+        'fill': False,
+        'hidden': hidden[i]
     }
     datasets.append(dataset)
 index = df.index.to_numpy()
