@@ -34,7 +34,7 @@
                     like question-answering. Take a look at the BoolQ task below.</p>
                 <div class="text-center">
                     <figure class="figure">
-                        <img src="qbool.PNG" class="img-fluid">
+                        <img src="qbool.PNG" class="img-fluid" style="max-width: 512px;">
                         <figcaption class="figure-caption">BoolQ task from SuperGLUE, a common NLP benchmark.</figcaption>
                     </figure>
                 </div>
@@ -100,23 +100,29 @@
                 <h4>Fitting things together</h4>
                 <p>Though modern language models don't explicitly use information from lower-level inputs like physics or audio, probing experiments have shown that language models contain information
                     that is applicable to a wide variety of tasks. This may be explained by the idea that large amounts of information about the world and our perception at various levels of abstraction are baked into
-                    our use of language, and can be learned through distributional language models. However, how and the extent to which this information is learned is unclear, and, as previously stated, aren't succeeding
+                    our use of language, and can be learned through distributional language models. However, how and the extent to which this information is learned is unclear, and, as previously stated, currently don't succeed
                     at complex situated tasks like instruction following.</p>
-                <p>The purpose of this research is to hone in on a sparsely-researched part of the abstraction tree: verbs from physics, as shown in the figure above. Most prior work in verb learning uses vision as input. Learning verbs from
-                    video is a very challenging problem. Humans, on the other hand, already have some mental model of objects and their behavior as infants, and acquire language later. Given this information, the questions
-                    this research asks are:</p>
-                <p></p>
-                <ol class="list-group">
-                    <li class="list-group-item">Using the spatial data of objects as input, can we learn representations of verbs? And if not, what can we represent?</li>
-                    <li class="list-group-item">What is the difference between what is learned from object-based models compared to vision-based models?</li>
-                </ol>
+                <p>The purpose of this research is to hone in on a sparsely-researched part of the abstraction tree: verbs from physics, as shown in the figure above. 
+                    Specifically, I'm interested in low-level verbs like <i>pick</i>, <i>put</i>, and <i>throw</i>. Most prior work in verb learning uses vision as input. Learning verbs from
+                    video is a very challenging problem in AI. On the other hand, humans already have some mental model of object motion from infancy, and acquire language later. Given this information, the question
+                    this research asks is:</p>
+                <blockquote class="blockquote px-5">Using the spatial data of objects as input, what representations can we learn? How well do these representations align with verbs?</blockquote>
             </div>
             <div id="spatial" class="mt-5">
                 <h2>Spatial data: In practice</h2>
+                <h4>Terms and Definitions</h4>
                 <p>Though we know that humans are able to represent objects and their physical behavior from infancy, what does this representation actually look like? Unfortunately, we don't know.
-                    In my case, I choose to go with common practice - euclidean space, where each object position is represented as a 3d vector with components $\{x, y, z\}$.
-                </p>
-                <div class="row">
+                    In my case, I choose to go with common euclidean space, where each object position is represented as a 3d vector with components $\{x, y, z\}$, and object rotation
+                    is represented as a 4d quaternion with components $\{x, y, z, w\}$.</p>
+                <div class="text-center">
+                    <figure class="figure">
+                        <img src="rollpitchyaw.png" class="img-fluid p-3" style="max-width: 512px;">
+                        <figcaption class="figure-caption">Roll (rotation about the z-axis), Pitch (x-axis), and Yaw (y-axis)</figcaption>
+                    </figure>
+                </div>
+                <p>I'll be referencing rotation in terms of <i>roll, pitch, and yaw</i> interchangeably with axes. Axes aren't universally consistent, but in this work, I use the <i>y-up</i> configuration
+                    consistent with Unity, where <b>roll</b> is around the z-axis, <b>pitch</b> is around the x-axis, and <b>yaw</b> is around the y-axis.</p>
+                <div class="row my-4">
                     <div class="col-sm-6">
                         <video autoplay muted loop style="max-width: 100%;">
                             <source type="video/mp4" src="video.mp4">
@@ -126,6 +132,73 @@
                         <canvas id="chart"></canvas>
                     </div>
                 </div>
+                <p>These position values may also be referred to as <b>absolute position</b>, kept relative to an arbitrary static world origin. These values can encounter problems in
+                    scenes with different origins or orientations. For example, if a linear regression were fit to a collection of scenes where the floor is at y-position $1.5$, and tested on a scene where the floor is at y-position
+                    $-2$, it would likely fail.</p>
+                <p>One way to address this is to use <b>relative position</b>, or position from the perspective of the viewer. In other words, no matter which way a viewer is
+                    looking, an object moving directly away from the viewer will be moving along the <i>relative</i> z-axis. A caveat of this is that the axis of gravity is unstable,
+                    since the direction of "up" changes with respect to the roll and pitch of the viewer.
+                    Another option is what I'll refer to is <b>look position</b>, or position rotated about the y-axis with respect to the viewer. This way, $\{x, z\}$ rotate with
+                    the direction the viewer is looking, but $y$ remains consistent with the global y-axis, or the axis of gravity. 
+                    Both of these are sensitive to the motion of the viewer. That is, all objects in a scene moving upward look identical
+                    to the viewer moving downward.</p>
+                <p>Finally, I'll be referencing <b>velocity</b>, or the change in position over time. Velocity is robust to different scene origins and orientations, but is unable to capture
+                    spatial relations, e.g. <i>the ball in on top of the table</i>.</p>
+                <h4>Special Considerations</h4>
+                <p>There are some things to consider when using euclidean spatial data, as opposed to words or images. These are not well-supported claims, just what I've noticed from my experiments.</p>
+                <ul class="list-group">
+                    <li class="list-group-item"><b>1. Transformers won't work.</b> The input is continuous and unbounded, so models that rely on discrete tokenized input, such as attention mechanisms, won't work.</li>
+                    <li class="list-group-item"><b>2. There are no good labels.</b> Since the goal of this project is to learn representations of object motion that <i>may or may not align with verbs</i>,
+                        there's no way to dictate exactly how a good representation should look. A good representation is one that is useful to carry out tasks higher in the abstraction tree, not necessarily
+                        one that aligns perfectly with low-level English verbs.</li>
+                    <li class="list-group-item"><b>3. It's difficult to normalize.</b> Euclidean space is infinite, so an apple may theoretically be moving around 7 billions meters away or 1 meter away.
+                        This is in contrast to image data, where RGB values are bounded to $[0, 1]$. Typically, people just constrain the space and it isn't that big of a deal. But in trying to build
+                        an intelligent agent that can adapt to various environments, it becomes a bigger problem.</li>
+                    <li class="list-group-item"><b>4. Real spatial data is noisy.</b> Imagine someone picking up an apple. There may be a clear, consistent trajectory this action follows.
+                        Now, compare this to a person quickly picking up an apple off a table in half a second. Compare that to someone picking up an apple off the ground in ten seconds, while shaking.
+                        In reality, when looking at natural data of people <i>doing stuff</i>, good examples of "pick up" may have extremely different trajectories.</li>
+                </ul>
+            </div>
+            <div id="models" class="mt-4">
+                <h2>Models</h2>
+                <h4>Preamble</h4>
+                <p>Now that I've gone over spatial data and why I'm using it, I'll talk about the things I've actually tried so far. Each approach I've tried doesn't correspond 1:1 to a model, but to a many-to-many
+                    collection of models, which makes it difficult to explain each approach in isolation. Therefore, I'll first go over the existing models I've used, before going over how the
+                    pieces fit together in the <a href="#approaches">Approaches</a> section.</p>
+                <p>However, before going into the models, I'll explain some technical parameters of the problem. I'm using the
+                    <a href="https://lunar.cs.brown.edu/nbc/">New Brown Corpus</a> dataset, which consists of participants narrating while performing everyday tasks in virtual kitchens.</p>
+                <div class="text-center my-4">
+                    <video width="960" height="540" controls>
+                        <source src="https://plunarlabcit.services.brown.edu/videos/1_1a_task1.mp4" type="video/mp4">
+                    </video>
+                </div>
+                <p>The dataset is broken up into 108 <i>recording sessions</i> that are around 5 minutes long each. Each has corresponding narration, video, and spatial data. The spatial data includes
+                    the <b>position</b> and <b>rotation</b> of every object (including the head and hands), every frame. There are 6 kitchens, 3 per participant. In all experiments, the participants are
+                    split up 14-2-2 train-dev-test, so each kitchen is seen at least once at train time.</p>
+                <p>The goal of each approach is to learn "actions", or cohesive, interesting patterns of motion that may align with verbs, or be useful for downstream verb-learning.
+                    In general, learning representations of actions can be broken down into segmentation and clustering. <b>Segmentation</b> is cutting the sessions
+                    into chunks of time, where each chunk of time corresponds to an action. <b>Clustering</b> is grouping similar chunks of time together, such that each cluster is representative of some
+                    action. Finally, <b>Transformation</b> is manipulating the data to make it easier to do segmentation and clustering. Each model described serves one or more of these three purposes.</p>
+                <!--TODO add timeline figure that shows segmentation pointing to graph that shows clustering-->
+                <h4>Feature-engineering</h4>
+                <p>Paragraph</p>
+                <h4>K-means</h4>
+                <p>Paragraph</p>
+                <h4>Energy-based motion pooling</h4>
+                <p>Paragraph</p>
+                <h4>Hidden semi-markov model</h4>
+                <p>Paragraph</p>
+                <h4>Autoencoder</h4>
+                <p>Paragraph</p>
+                <h4>LSTM</h4>
+                <p>Paragraph</p>
+            </div>
+            <div id="approaches">
+                <h2>Approaches</h2>
+                <h4>HSMM based</h4>
+                <p>This section describes approaches that all consist of some data transformation, followed by an HSMM for simultaneous segmentation and clustering.</p>
+                <h4>K-means based</h4>
+                <p>More recently, I decided to try something that doesn't have an HSMM at the end, and opted instead for a simpler approach - K-means.</p>           
             </div>
         </div>
         <footer class="py-5 mt-5 border-top"></footer>
