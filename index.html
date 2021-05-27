@@ -181,22 +181,84 @@
                     action. Finally, <b>Transformation</b> is manipulating the data to make it easier to do segmentation and clustering. Each model described serves one or more of these three purposes.</p>
                 <!--TODO add timeline figure that shows segmentation pointing to graph that shows clustering-->
                 <h4>Feature-engineering</h4>
-                <p>Paragraph</p>
+                <p><i>Feature-engineering</i> is an umbrella term referring to any <b>transformations</b> I make that don't correspond to a model.
+                    In practice, this typically consists of preprocessing steps like scaling or trimming outliers,
+                    but may also involve more complex transformations like taking the magnitude velocity of the most moving object,
+                    representing a trajectory in terms of its peak and trough, etc.</p>
                 <h4>K-means</h4>
-                <p>Paragraph</p>
+                <p>I use K-means for unsupervised <b>clustering</b>, which clusters data according to distance to centroids.
+                    The number of clusters must be specified. Likewise for time-series data, I use 
+                    <a href="https://tslearn.readthedocs.io/en/stable/gen_modules/clustering/tslearn.clustering.TimeSeriesKMeans.html">
+                    Time Series K-Means</a>. With a
+                    <a href="https://en.wikipedia.org/wiki/Dynamic_time_warping">Dynamic Time Warping</a> 
+                    distance function, this algorithm allows time series data of different lengths to be clustered.</p>
+                <p>Related to K-means, I also use <a href="https://www.is.mpg.de/uploads_file/attachment/attachment/442/1000-v2.pdf">Hierarchical Dynamic Clustering</a>,
+                    a clustering algorithm for which the number of clusters is unspecified. Instead, a parameter is set that influences the number of clusters. This is
+                    advantageous in cases where it's difficult to know a suitable number of clusters.</p>
                 <h4>Energy-based motion pooling</h4>
-                <p>Paragraph</p>
+                <p><a href="https://www.is.mpg.de/uploads_file/attachment/attachment/442/1000-v2.pdf">Energy-based motion pooling</a> 
+                    is a <b>segmentation</b> model based on identifying energy or motion <i>peaks</i>, and considering windows around them to
+                    be motion <i>segments</i>. The way this is done is as follows:</p>
+                <ol>
+                    <li>Discretize the position data into many small clusters, effectively binning the data.</li>
+                    <li>Using a sliding window across the data, compute the <i>energy</i> of each window, or number of transitions between clusters.</li>
+                    <li>Apply a gaussian smoothing filter to the energy curve.</li>
+                    <li>Identify peaks in the energy curve.</li>
+                    <li>Designate actions as windows around peaks based on peak prominence.</li>
+                </ol>
                 <h4>Hidden semi-markov model</h4>
-                <p>Paragraph</p>
+                <p>The <a href="https://en.wikipedia.org/wiki/Hidden_semi-Markov_model">hidden semi-markov model</a> is a bayesian model that simultaneously performs <b>segmentation</b> and <b>clustering</b>.
+                    Like a hidden markov model, it consists of states and transitions, and the ability to compute the maximum
+                    likelihood state sequence given some data. However, unlike a hidden markov model,
+                    the hidden <b>semi-</b>markov model also considers the number of timesteps or expected <i>length</i> in each state.
+                    By taking the maximum-likelihood state sequence of a data sequence given a hidden semi-markov model, we
+                    end up with a segmented, labeled sequence.</p>
+                <h4>Principle Component Analysis</h4>
+                <p>Principle Component Analysis or PCA is a common algorithm that reduces the dimensionality of data while trying
+                    to retain as much information as possible. It is a popular <b>transformation</b> of data.</p>
                 <h4>Autoencoder</h4>
-                <p>Paragraph</p>
+                <p>Like PCA, an autoencoder or AE <b>transforms</b> data by encoding it to a smaller representation.
+                    It does so using an encoder-decoder neural network architecture, where the encoder network encodes
+                    the data to a reduced representation, and the decoder network attempts to reconstruct the original input
+                    from the reduced representation.</p>
+                <p>I also use a variational autoencoder or VAE, a probabilistic variation of the autoencoder that produces a smooth
+                    encoded manifold. This means that, if unseen points are sampled from the encoding space, it should
+                    produce plausible outputs.</p>
                 <h4>LSTM</h4>
-                <p>Paragraph</p>
+                <p>Finally, I <b>transform</b> data using an LSTM, a form of recurrent neural network that models sequential data
+                    by processing timesteps in terms of previous timesteps. LSTMs are very popular modern baseline when working
+                    with sequential data like sentences or videos.</p>
             </div>
             <div id="approaches">
                 <h2>Approaches</h2>
                 <h4>HSMM based</h4>
-                <p>This section describes approaches that all consist of some data transformation, followed by an HSMM for simultaneous segmentation and clustering.</p>
+                <p>Most of my time spent working with spatial data, I've done so with an HSMM based pipeline.
+                    This pipeline can be summarized as follows:</p>
+                <ol>
+                    <li>Some <b>transformations</b> to the data, such as <b>feature-engineering</b>, <b>autoencoders</b> or
+                    <b>LSTMs</b>.</li>
+                    <li>An <b>HSMM</b> for simultaenous <b>segmentation</b> and <b>clustering</b>.</li>
+                </ol>
+                <p>Throughout these attempts, representing months of research, the question was:</p>
+                <blockquote class="blockquote px-5">How can I transform the data so that the HSMM is able to produce the best
+                    possible segments and clusters?</blockquote>
+                <p>For the HSMM itself, I stuck to a Gaussian observation model. That is, each state can only produce
+                    values according to some mean and variation. This means that a state is unable to represent dynamic data,
+                    i.e. a single state can't represent the $\{x, y, z\}$ position of an object moving from one place to another.
+                    Therefore, the goal is to represent this motion in terms of values that don't change (except when trying to
+                    represent a different motion), before feeding it to the hsmm.</p>
+                <!--
+                    HSMM
+                    ---
+                    - Direct inputs
+                    - LSTM
+                    - Autoencoder
+
+                -->
+                <h6>Direct Inputs</h6>
+                <p>The simplest way to represent motion as a single value is to take the derivative. The derivative of position is
+                    velocity.
+                </p>
                 <h4>K-means based</h4>
                 <p>More recently, I decided to try something that doesn't have an HSMM at the end, and opted instead for a simpler approach - K-means.</p>           
             </div>
