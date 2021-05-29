@@ -247,20 +247,110 @@
                     i.e. a single state can't represent the $\{x, y, z\}$ position of an object moving from one place to another.
                     Therefore, the goal is to represent this motion in terms of values that don't change (except when trying to
                     represent a different motion), before feeding it to the hsmm.</p>
-                <!--
-                    HSMM
-                    ---
-                    - Direct inputs
-                    - LSTM
-                    - Autoencoder
-
-                -->
-                <h6>Direct Inputs</h6>
+                <p>One limitation of HSMM is memory complexity, at least for the torch-struct library I used. I could only 
+                    handle up to 8 states at once, which may have been a problematic constraint.</p>
+                <h5>Evaluation</h5>
+                <p>For all approaches I'll discuss below, I evaluated with an odd-man-out evaluation paradigm. That is,
+                    given some labeled segments, I select 3 corresponding video clips with the same label, and 1 with a
+                    different label. Then, I shuffle and present these and ask: which one is the odd man out? The idea is that,
+                    if the clusters are good, it should be easy to identify which one doesn't belong.
+                <p><b>All approaches I'll discuss, unless specified otherwise, performed at random on the odd-man-out
+                evaluation.</b> So, for each, I'll talk about where it succeeded <i>qualitatively</i>, and
+                why or how it failed at odd-man-out, but I won't restate that it performed at random each time.</p>
+                <h5>Direct Inputs</h5>
                 <p>The simplest way to represent motion as a single value is to take the derivative. The derivative of position is
-                    velocity.
+                    <b>velocity</b>. I tried directly inputting velocity at each timestep to the HSMM with the following configurations:</p>
+                <ul class="list-group mb-3" id="velocity-trials">
+                    <li class="list-group-item">Right hand relative $z$, or movement of the right hand to/from the head.
+                        This successfully captures some recognizable away-from-head or toward-head segments, but is
+                        muddled by the subtle, noisy motions in the data.</li>
+                    <li class="list-group-item">Right hand relative $\{y, z\}$, or height and depth motion of the right hand.
+                        This performs similarly to only depth and doesn't cause noticable qualitative change.</li>
+                    <li class="list-group-item">Both hands relative $z$ and $\{y, z\}$. There are still some recognizable motions,
+                        now with both hands, but overall appears more muddled than before.</li>
+                    <li class="list-group-item">Relative $\{x, y, z\}$ velocity of the most-moving object. This successfully captures some
+                        notion of when an object is moving, but is indifferentiable otherwise.</li>
+                    <li class="list-group-item">Right hand <i>and</i> most-moving object relative $\{x, y, z\}$. Some reconizeable motions,
+                        but not clear.</li>
+                    <li class="list-group-item">Right hand $\{x, y, z\}$ and most-moving object <i>magnitude</i> velocity. A bit clearer than
+                        before, but still, of course, unsuccessful in odd-man-out.</li>
+                    <li class="list-group-item">Right hand $\{x, y, z\}$ and binary value for whether any object is moving. Yet a bit clearer
+                        than before, allowing the model to easily distinguish object-moving hand motions from other hand motions, but still
+                        unsuccessful in odd-man-out, and feels a bit hacky.</li>
+                </ul>
+                <p>Given lack of success of odd-man-out on any of these attempts, I did also try a sanity-check setup strongly expected to succeed.
+                    That is, <i>is any object moving?</i> For this, I transform the data such that it's only a binary value at each timestep
+                    for whether any object velocity is above some threshold. I train a 2-class HSMM. This does reach an odd-man-out accuracy
+                    of 90%. Even this is surprisingly low given how simple the task seems. Qualitatively, it can sometimes be difficult to tell
+                    whether an object is even moving in a video, since many clips consist of a participant hovering their hand over an object
+                    and barely moving it, to such a fine degree that it's difficult to distinguish if it should actually be considered moving.
+                    This is something that I think really helps, when evaluting, to illuminate the challenge of the dataset.</p>
                 </p>
+                <h5>Autoencoder</h5>
+                <p>I thought an autoencoded representation of motion may be more robust than direct velocity. So, using a sliding
+                    window over the data where window size $w=\{.5s, 1s, 2s\}$, I divide the data into chunks that I encode with
+                    a VAE. I do a search of many different VAE hyperparameters and build an interface to thoroughly debug what the
+                    autoencoder is doing, representing some weeks of work. Some particular configurations are as follows:</p>
+                <ul class="list-group mb-3">
+                    <li class="list-group-item">Autoencoders with velocity as input, similar to in <a href="#velocity-trials">Direct Inputs</a>
+                        These performed similarly to direct inputs.</li>
+                    <li class="list-group-item">Concatenated autoencoder representations, where a different autoencoder is trained for
+                        each hand, each object, etc., then concatenated. This didn't work at all, which makes sense, since
+                        the latent spaces are completely unrelated.</li>
+                    <li class="list-group-item">Hand and object autoencoders, where a separate autoencoder is trained on hand motion, and
+                        another on object motion. The most-moving-hand and most-moving-object encoding are concatenated. This provides some
+                        identifiable motions, and seems qualitatively to be the best of the autoencoder > HSMM approaches, despite still
+                        failing the odd-man-out evaluation.</li>
+                    <li class="list-group-item">Same as previous, concatenated with a one-hot vector indicating which object is moving.
+                        This should theoretically separate object motions by object identity, but still suffers the same problems as before,
+                        and is hindered by the memory constraints of the HSMM to have enough states to separately represent motion for each object.</li>
+                </ul>
+                <p>I also tested a vanilla autoencoder and disentangled VAE, but neither of these yielded better performance. I also tried different
+                    preprocessing steps, including clipping the velocity to a limited range, z-norm, min-max scaling, and robust scaling.</p>
+                <h5>LSTM</h5>
+                <p>I tested an LSTM > HSMM approach similar to the VAE > HSMM approach above. However, instead of transforming the data with a VAE,
+                    I do so with an LSTM, by taking the final hidden state of an LSTM trained to predict the next timestep of a sequence. To avoid
+                    making the task too easy, I experiment with adding a delay to the prediction, i.e. the LSTM should predict velocity half a second after
+                    the input sequence.</p>
+                <p>This was never successful, always providing qualitatively indecipherable representations. To try to rule out bugs,
+                    I visualized the success of the delayed prediction model, which is qualitatively nearly perfect without a delay, very good with a half-second delay,
+                    and okay with a one-second delay. I also set it up as a classification task, using a small dataset of expert-labeled reach,
+                    pick, put, and retract actions, which it succeeds at. So, it seems the LSTM works, but for another reason doesn't provide
+                    decipherable representations.</p>
                 <h4>K-means based</h4>
-                <p>More recently, I decided to try something that doesn't have an HSMM at the end, and opted instead for a simpler approach - K-means.</p>           
+                <p>More recently, I opted for an HSMM-free approach, for which segmentation is separate from clustering, and K-means
+                    is used for clustering. For this approach, I only used one pipeline, as follows:</p>
+                <ol>
+                    <li>Use Hierarchical Dynamic Clustering to discretize absolute position data.</li>
+                    <li>Apply Energy-based Motion Pooling for segmentation.</li>
+                    <li>Cluster segments using Time Series K-means clustering.</li>
+                </ol>
+                <p>Using Energy-based Motion Pooling for segmentation was qualitatively very successful - the segments appear to
+                    correspond very well to clearly identifiable actions of varying granularity. For example, moving an object
+                    from one place to another may be a segment, and within that segment, a pick motion may be another segment.
+                    This is because these each correspond to motion peaks, but the prominence of one peak is much higher,
+                    causing its surrounding window to encompass the other's.</p>
+                <p>Despite this good looking segmentation, clustering wasn't so successful. I wasn't able to qualitatively
+                    evaluate the clusters, since the interface wasn't set up to handle overlapping clusters (which may be a 
+                    future to-do). But in the odd-man-out evaluation, no clusters were identifiable at all, yielding random accuracy.</p>
+                <p>It's worth noting that, since segmentation and clustering are separate here, any number of clustering models could be
+                    applied - I just only tested K-means. I can imagine a number of possible next steps here, but given that this 
+                    "almost there, just need to try one more thing" phenomenon has been going on for over a year, I decided to instead
+                    write up this post giving an overview of everything attempted so far.</p>
+            </div>
+            <div id="conclusion">
+                <h2>Takeaways</h2>
+                <p>My personal takeaway is that, many of these models seem to be <i>almost there</i>, but none have been successful.
+                    I think that the primary issue is the data - it's very small and noisy. Something that I think really highlights
+                    this is the fact that the <i>is any object moving?</i> setup only gets 90% accuracy. Natural motion is just
+                    really hard to clearly divide into actions, using spatial data alone. Some options I see are:</p>
+                <ol>
+                    <li>Abandon spatial data, move on to more abstract inputs, like seen in ALFRED.</li>
+                    <li>Keep testing more models and try to wrap up this chapter on spatial data.</li>
+                    <li>Go all-in on spatial data and develop a larger, artificial dataset for developing physics-based 
+                        grounding models. A sufficiently large dataset in a constrained environment may make
+                        transformer-based models feasible.</li>
+                </ol>
             </div>
         </div>
         <footer class="py-5 mt-5 border-top"></footer>
